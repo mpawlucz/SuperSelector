@@ -8,7 +8,7 @@
 			this.config = this.pConfigOptions;
 			
 			this.ignoreClasses = "hover, mouseOver";
-			this.ignoreIdPrefixes = "generic_";
+			this.ignoreIdPrefixes = "generic_, isc_";
 			
 			this.prevElement = null;
 			this.prevElementBorder = null;
@@ -21,6 +21,7 @@
 	{
 		if(oEvent.ctrlKey || oEvent.metaKey) 
 		{
+			oEvent.preventDefault();
 			/* Update current values */
 			this.message = document.getElementById("superselect_generated").innerHTML;
 			this.pConfigOptions = "";
@@ -290,7 +291,7 @@
 		{
 			if (foundElements[i] == this.currentElement)
 			{
-				return className + ":nth-child(" + (i+1) + ")";
+				return className + ":eq(" + (i) + ")";
 			}
 		}
 		
@@ -341,7 +342,7 @@
 		head.appendChild(css);
 
 		var superselectorHtml = 
-			"<div id='superselect' class='superselect superselect_dockright'>" +
+			"<div id='superselect' class='superselect superselect_dockright' style='z-index:999999999; height:500px;'>" +
 			"<div id='superselect_tabs'>" +
 			"<ul>" +
 				"<li id='superselect_generatortab' class='superselect_activetab' onclick=\"superselector.prototype.setActive('superselect_generatortab', 'superselect_generator')\">Generator</li>" +
@@ -351,7 +352,7 @@
 			"</div>" +
 			"<div id='superselect_tabcontent'>" +
 				"<div id='superselect_generator'>" +
-					"<div id='superselect_generated'></div>" +
+					"<div id='superselect_generated' style='height: 400px;'></div>" +
 					"<div class='superselect_genoptions'>" +
 						"<input id='ignoreAllConfig' type='checkbox' value='Ignore all config' name=''>" +
 						"<span>Ignore all config</span>" +

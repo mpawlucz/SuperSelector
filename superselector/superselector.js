@@ -7,8 +7,8 @@
 			this.pConfigOptions = ["Ignore all config"];
 			this.config = this.pConfigOptions;
 			
-			this.ignoreClasses = "hover, mouseOver";
-			this.ignoreIdPrefixes = "generic_, isc_";
+			this.ignoreClasses = "hover, mouseOver, stretchImgButtonOver, buttonTitleOver, tallCellOverDark, tallCellOver, menuTitleFieldOver, tallCellSelectedOver";
+			this.ignoreIdPrefixes = "generic_, isc_, gwt-uid-";
 			
 			this.prevElement = null;
 			this.prevElementBorder = null;
@@ -19,20 +19,33 @@
 
 	superselector.prototype.handleClick = function(oEvent)
 	{
-		if(oEvent.ctrlKey || oEvent.metaKey) 
+		if(oEvent.ctrlKey || oEvent.metaKey)
 		{
 			oEvent.preventDefault();
+
 			/* Update current values */
 			this.message = document.getElementById("superselect_generated").innerHTML;
 			this.pConfigOptions = "";
 			this.ignoreClasses = document.getElementById("ignoreClasses").value;
 			this.ignoreIdPrefixes = document.getElementById("ignoreIdPrefixes").value;
 			
-			var genConfig = new superselector.Config(this.ignoreClasses, this.ignoreIdPrefixes, this.configOptionIsSelected("ignoreAllConfig"));
+			var genConfig = new superselector.Config(this.ignoreClasses, this.ignoreIdPrefixes, this.configOptionIsSelected("ignoreAllConfig"), this.configOptionIsSelected("allowByText"));
 			var elementTarget = new superselector.Target(oEvent.target, genConfig);
-			document.getElementById("superselect_generated").innerHTML = (elementTarget.calculateSelector());
 			this.highlight(oEvent.target);
-			this.setActive('superselect_generatortab', 'superselect_generator')
+			var calculateSelector = '';
+			if (genConfig.allowByText){
+				var calculateSelector = elementTarget.calculateSelector(true);
+				if (this.countOccurences(calculateSelector) != 1){
+					calculateSelector = elementTarget.calculateSelector(false);
+				}
+			} else {
+				calculateSelector = elementTarget.calculateSelector(false);
+			}
+			calculateSelector = this.optimizeSelector(calculateSelector);
+			document.getElementById("verificationResult").value = this.countOccurences(calculateSelector);
+
+            document.getElementById("superselect_generated").innerHTML = (calculateSelector);
+			this.setActive('superselect_generatortab', 'superselect_generator');
 		}
 	};
 
@@ -54,6 +67,46 @@
 			return true;
 		}
 		return false;
+	};
+
+	superselector.prototype.countOccurences = function(selectorText){
+		return jQuery(selectorText).length;
+	};
+
+	superselector.prototype.optimizeSelector = function(selectorText){
+		var containsSplit = selectorText.split(":contains");
+		var pre = containsSplit[0];
+		var byText = '';
+		if (containsSplit.length <= 1){
+			/*does not contain (contains)*/
+			byText = '';
+		} else {
+			byText = ':contains' + containsSplit[1];
+		}
+
+		var selectorJoints = pre.split(' ');
+
+		var optimizedQueryPre = '';
+		for (var i=selectorJoints.length-1; i>=0; --i){
+			if (byText.length > 0){
+				if (selectorJoints[i].indexOf(':eq(') >= 0){
+					selectorJoints[i] = selectorJoints[i].split(":eq(")[0];
+				}
+				if (selectorJoints[i].indexOf(':nth-child(') >= 0){
+					selectorJoints[i] = selectorJoints[i].split(":nth-child(")[0];
+				}
+			}
+			optimizedQueryPre = selectorJoints[i] + ' ' + optimizedQueryPre;
+			optimizedQueryPre = optimizedQueryPre.trim();
+			var optimizedQueryFull = optimizedQueryPre + byText;
+			var occurencesCount = this.countOccurences(optimizedQueryFull);
+			console.log(optimizedQueryFull, occurencesCount);
+			if (occurencesCount == 1){
+				return optimizedQueryFull;
+			}
+		}
+
+		return selectorText;
 	};
 
 	superselector.prototype.setActive = function(tabIdToSetActive, tabContentIdToDisplay)
@@ -95,11 +148,12 @@
 
 
 	/* CONFIG */
-	superselector.Config = function(ignoreClasses, ignoreIdPrefixes, disableConfig)
+	superselector.Config = function(ignoreClasses, ignoreIdPrefixes, disableConfig, allowByText)
 	{
 		this.disableConfig = disableConfig;
 		this.ignoreClasses = ignoreClasses.replace(/\s+/g, '').split(/\s*,\s*/);
 		this.ignoreIdPrefixes = ignoreIdPrefixes.replace(/\s+/g, '').split(/\s*,\s*/);
+		this.allowByText = allowByText;
 	};
 	/* END OF CONFIG */
 
@@ -116,14 +170,21 @@
 		this.ignoreClasses = oConfig.ignoreClasses;
 	};
 
-	superselector.Target.prototype.calculateSelector = function()
+	superselector.Target.prototype.calculateSelector = function(withText)
 	{
-		var prefix = '$$("';
-		var suffix = '");';
+		var prefix = '';
+		var suffix = '';
 		
 		this.traverseAndCalc(this.targetElement);
-		
-		return prefix + this.generateSelectorString() + suffix;
+
+		var text = '';
+		if (withText){
+			if (this.targetElement.innerText && this.targetElement.innerText.length > 0 && this.targetElement.innerText.indexOf("\n") < 0){
+				text = ':contains('+this.targetElement.innerText+')';
+			}
+		}
+
+		return prefix + this.generateSelectorString() + text + suffix;
 	};
 
 	superselector.Target.prototype.generateSelectorString = function()
@@ -342,7 +403,7 @@
 		head.appendChild(css);
 
 		var superselectorHtml = 
-			"<div id='superselect' class='superselect superselect_dockright' style='z-index:999999999; height:500px;'>" +
+			"<div id='superselect' class='superselect superselect_dockright' style='z-index:999999999; height:400px;'>" +
 			"<div id='superselect_tabs'>" +
 			"<ul>" +
 				"<li id='superselect_generatortab' class='superselect_activetab' onclick=\"superselector.prototype.setActive('superselect_generatortab', 'superselect_generator')\">Generator</li>" +
@@ -352,11 +413,15 @@
 			"</div>" +
 			"<div id='superselect_tabcontent'>" +
 				"<div id='superselect_generator'>" +
-					"<div id='superselect_generated' style='height: 400px;'></div>" +
+					"<div id='superselect_generated' style='height: 300px;'></div>" +
 					"<div class='superselect_genoptions'>" +
+						"<input id='verifyUniqueness' type='button' value='Recalc' name=''>" +
+						"<input id='verificationResult' type='text' value='' name=''>" +
 						"<input id='ignoreAllConfig' type='checkbox' value='Ignore all config' name=''>" +
 						"<span>Ignore all config</span>" +
-					"</div>" +
+						"<input id='allowByText' type='checkbox' value='Allow by text' name='' checked='checked'>" +
+						"<span>Allow by text</span>" +
+			"</div>" +
 				"</div>" +
 				"<div id='superselect_config1' class='superselect_hidden'>" +
 					"<div>Comma-delimiter list of classes to ignore  (E.g 'hover, mouseOver')</div>" +
@@ -375,8 +440,13 @@
 		document.getElementById("superselect_generated").innerHTML = oSS.message;
 		document.getElementById("ignoreClasses").value = oSS.ignoreClasses;
 		document.getElementById("ignoreIdPrefixes").value = oSS.ignoreIdPrefixes;
-		
-		document.body.addEventListener("click", oSS.handleClick.bind(oSS), false);
+		document.getElementById("verifyUniqueness").addEventListener("mouseover", function(evt){
+			var found2 = jQuery(document.getElementById("superselect_generated").innerHTML);
+			console.log(found2);
+			document.getElementById("verificationResult").value = found2.length;
+		});
+
+		document.body.addEventListener("mouseover", oSS.handleClick.bind(oSS), false);
 	};
 	
 	new superselector();

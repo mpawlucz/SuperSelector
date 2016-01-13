@@ -29,7 +29,9 @@
 			this.ignoreClasses = document.getElementById("ignoreClasses").value;
 			this.ignoreIdPrefixes = document.getElementById("ignoreIdPrefixes").value;
 			
-			var genConfig = new superselector.Config(this.ignoreClasses, this.ignoreIdPrefixes, this.configOptionIsSelected("ignoreAllConfig"), this.configOptionIsSelected("allowByText"));
+			var genConfig = new superselector.Config(this.ignoreClasses, this.ignoreIdPrefixes,
+				this.configOptionIsSelected("ignoreAllConfig"), this.configOptionIsSelected("allowByText"),
+				this.configOptionIsSelected("allowOptimize"));
 			var elementTarget = new superselector.Target(oEvent.target, genConfig);
 			this.highlight(oEvent.target);
 			var calculateSelector = '';
@@ -41,7 +43,10 @@
 			} else {
 				calculateSelector = elementTarget.calculateSelector(false);
 			}
-			calculateSelector = this.optimizeSelector(calculateSelector);
+
+			if (genConfig.allowOptimize && this.isByText(calculateSelector)){
+				calculateSelector = this.optimizeSelector(calculateSelector);
+			}
 			document.getElementById("verificationResult").value = this.countOccurences(calculateSelector);
 
             document.getElementById("superselect_generated").innerHTML = (calculateSelector);
@@ -71,6 +76,10 @@
 
 	superselector.prototype.countOccurences = function(selectorText){
 		return jQuery(selectorText).length;
+	};
+
+	superselector.prototype.isByText = function(selectorText){
+		return selectorText.indexOf(":contains(") >= 0;
 	};
 
 	superselector.prototype.optimizeSelector = function(selectorText){
@@ -148,12 +157,13 @@
 
 
 	/* CONFIG */
-	superselector.Config = function(ignoreClasses, ignoreIdPrefixes, disableConfig, allowByText)
+	superselector.Config = function(ignoreClasses, ignoreIdPrefixes, disableConfig, allowByText, allowOptimize)
 	{
 		this.disableConfig = disableConfig;
 		this.ignoreClasses = ignoreClasses.replace(/\s+/g, '').split(/\s*,\s*/);
 		this.ignoreIdPrefixes = ignoreIdPrefixes.replace(/\s+/g, '').split(/\s*,\s*/);
 		this.allowByText = allowByText;
+		this.allowOptimize = allowOptimize;
 	};
 	/* END OF CONFIG */
 
@@ -402,6 +412,13 @@
 		var head = document.getElementsByTagName('head')[0];
 		head.appendChild(css);
 
+		if (typeof window.jQuery == 'undefined') {
+			var tagScript = document.createElement('script');
+			tagScript.type = "text/javascript";
+			tagScript.src = "https://code.jquery.com/jquery-1.11.3.js";
+			document.getElementsByTagName('head')[0].appendChild(tagScript);
+		}
+
 		var superselectorHtml = 
 			"<div id='superselect' class='superselect superselect_dockright' style='z-index:999999999; height:400px;'>" +
 			"<div id='superselect_tabs'>" +
@@ -421,6 +438,9 @@
 						"<span>Ignore all config</span>" +
 						"<input id='allowByText' type='checkbox' value='Allow by text' name='' checked='checked'>" +
 						"<span>Allow by text</span>" +
+						"<br/>" +
+						"<input id='allowOptimize' type='checkbox' value='Optimize' name='' checked='checked'>" +
+						"<span>Optimize</span>" +
 			"</div>" +
 				"</div>" +
 				"<div id='superselect_config1' class='superselect_hidden'>" +
